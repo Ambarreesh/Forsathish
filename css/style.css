@@ -252,7 +252,7 @@ body.is-ready [data-intro] { opacity: 1; transform: none; }
 .drive__glow { position: absolute; left: var(--x); top: var(--y); width: 13%; aspect-ratio: 2.2; translate: -50% -50%; background: radial-gradient(50% 50% at 50% 50%, rgb(255 255 255 / .95), rgb(230 240 255 / .45) 26%, transparent 70%); mix-blend-mode: screen; opacity: 0; pointer-events: none; }
 .drive__glow--far { width: 6.5%; }
 
-.drive__blueprint { position: absolute; left: 28.1%; top: 69.3%; width: 15.9%; aspect-ratio: 1; translate: -50% -50%; overflow: visible; opacity: 0; pointer-events: none; }
+.drive__blueprint { position: absolute; left: 28.3%; top: 72.9%; width: 18.2%; aspect-ratio: 1; translate: -50% -50%; overflow: visible; opacity: 0; pointer-events: none; }
 .drive__blueprint .bp { fill: none; stroke: var(--on-dark); stroke-width: 1.1; vector-effect: non-scaling-stroke; stroke-dasharray: 1 1; stroke-dashoffset: 1; }
 .drive__blueprint .bp--3 { stroke: var(--on-dark-2); }
 .drive__blueprint .bp--c { stroke: var(--accent); stroke-width: .8; }

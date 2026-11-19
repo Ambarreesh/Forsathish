@@ -77,13 +77,13 @@
   stage.appendChild(veil);
 
   /* ---------- layout: frame the car to fit any screen shape ----------
-     Measured on the 1280×960 photo: the car (beacon to tyres) spans x 23–71%,
-     y 23.5–78.5%, centred at (47%, 51%). Cover the screen when that still keeps
-     the whole car in view; otherwise shrink until the car fits (≤ 74% of the
-     height, ≤ 52% of the width on phones). Edges are masked into the stage. */
-  const AR = 4 / 3;
-  const CAR = { cx: 0.47, cy: 0.51, w: 0.48, h: 0.55 };
-  const WHEEL = [0.281, 0.693]; // front-left wheel centre
+     Measured on the 1187×881 photo: the car (beacon to tyres) spans x 22–80.5%,
+     y 20–85%, centred at (51.3%, 52.5%). Cover the screen when that still keeps
+     the whole car in view; otherwise shrink until the car fits (≤ 86% of the
+     height, ≤ 86% of the width). Edges are masked into the stage. */
+  const AR = 1187 / 881;
+  const CAR = { cx: 0.513, cy: 0.525, w: 0.583, h: 0.65 };
+  const WHEEL = [0.283, 0.729]; // front-left wheel centre
   let vw = 0, vh = 0, fw = 0, fh = 0, fx = 0, fy = 0, phone = false, nudged = false;
   const layout = () => {
     vw = innerWidth; vh = innerHeight;
