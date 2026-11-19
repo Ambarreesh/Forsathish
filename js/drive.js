@@ -66,35 +66,35 @@
   caption.style.height = "92px";
 
   /* ---------- end veil (merges into the next section) ---------- */
-  // blurred copy of the photo fills any space the framed photo doesn't (ultrawide / tall screens)
-  const ambient = document.createElement("div");
-  ambient.className = "drive__ambient";
-  ambient.setAttribute("aria-hidden", "true");
-  stage.insertBefore(ambient, stage.firstChild);
-
   const veil = document.createElement("div");
   veil.style.cssText = "position:absolute;inset:0;background:var(--dark);opacity:0;pointer-events:none;z-index:2";
   stage.appendChild(veil);
 
   /* ---------- layout: frame the car to fit any screen shape ----------
-     Measured on the 1280×960 photo: the car (beacon to tyres) spans x 23–71%,
-     y 23.5–78.5%, centred at (47%, 51%). Cover the screen when that still keeps
-     the whole car in view; otherwise shrink until the car fits (≤ 74% of the
-     height, ≤ 52% of the width on phones). Edges are masked into the stage. */
-  const AR = 4 / 3;
-  const CAR = { cx: 0.47, cy: 0.51, w: 0.48, h: 0.55 };
-  const WHEEL = [0.281, 0.693]; // front-left wheel centre
-  let vw = 0, vh = 0, fw = 0, fh = 0, fx = 0, fy = 0, phone = false, nudged = false;
+     Measured on the 1456×1080 photo: the car (beacon to tyres) spans x 22–80.5%,
+     y 20–85%, centred at (51.3%, 52.5%). Cover the screen when that still keeps
+     the whole car in view; otherwise shrink until the car fits (≤ 86% of the
+     height, ≤ 86% of the width). Edges are masked into the stage. */
+  const AR = 1456 / 1080;
+  const CAR = { cx: 0.513, cy: 0.525, w: 0.583, h: 0.65 };
+  const WHEEL = [0.283, 0.729]; // front-left wheel centre
+  let vw = 0, vh = 0, fw = 0, fh = 0, fx = 0, fy = 0, panFrom = 0, panTo = 0, phone = false, nudged = false;
+  /* full-bleed: the photo always covers the whole screen, edge to edge, sharp.
+     Within that, slide it so the car sits as centred as the crop allows. */
   const layout = () => {
     vw = innerWidth; vh = innerHeight;
     phone = vw < 760;
-    const cover = Math.max(vw, vh * AR);
-    const byHeight = (vh * 0.86) / CAR.h * AR;      // frame width at which the car is 86% of the height
-    const byWidth = (vw * (phone ? 0.92 : 0.86)) / CAR.w;
-    fw = Math.min(cover, byHeight, byWidth);
+    fw = Math.max(vw, vh * AR);
     fh = fw / AR;
-    fx = vw / 2 - fw * CAR.cx;
-    fy = vh * (phone ? 0.46 : 0.54) - fh * CAR.cy;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    fx = clamp(vw / 2 - fw * CAR.cx, vw - fw, 0);
+    fy = clamp(vh / 2 - fh * CAR.cy, vh - fh, 0);
+    // narrow screens can't show the whole car at once: pan from the rear to the front wheel
+    const carL = 0.222 * fw, carR = 0.805 * fw;
+    if (carR - carL > vw * 0.98) {
+      panFrom = clamp(vw - carR - 12, vw - fw, 0); // rear of the car in view
+      panTo = clamp(-carL + 12, vw - fw, 0);       // front wheel in view
+    } else { panFrom = panTo = fx; }
     nudged = false;
   };
   layout();
@@ -132,22 +132,22 @@
     // 1 · title
     words.forEach((w, i) => {
       const k = SS.easeOut(R(p, 0.015 + i * 0.03, 0.09 + i * 0.03));
-      const o = SS.easeIn(R(p, 0.33, 0.41));
+      const o = SS.easeIn(R(p, 0.2, 0.28));
       w.style.opacity = (k * (1 - o)).toFixed(3);
       w.style.transform = `translate3d(0, ${((1 - k) * 0.5 - o * 0.4).toFixed(3)}em, 0)`;
     });
-    const eo = R(p, 0.0, 0.05) * (1 - R(p, 0.31, 0.38));
+    const eo = R(p, 0.0, 0.05) * (1 - R(p, 0.19, 0.26));
     eyebrow.style.opacity = eo.toFixed(3);
-    const so = SS.easeOut(R(p, 0.1, 0.17));
-    const sOut = R(p, 0.32, 0.4);
+    const so = SS.easeOut(R(p, 0.08, 0.14));
+    const sOut = R(p, 0.19, 0.27);
     sub.style.opacity = (so * (1 - sOut)).toFixed(3);
     sub.style.transform = `translate3d(0, ${((1 - so) * 16 - sOut * 24).toFixed(1)}px, 0)`;
 
     // 2 · light sweep + the amber beacon on the roll hoop
-    const sweep = SS.easeInOut(R(p, 0.12, 0.38));
+    const sweep = SS.easeInOut(R(p, 0.27, 0.45));
     shade.style.backgroundPosition = `${((1 - sweep) * 100).toFixed(2)}% 0`;
-    const ign = R(p, 0.3, 0.36);
-    const zoomK = R(p, 0.64, 0.74);
+    const ign = R(p, 0.4, 0.46);
+    const zoomK = R(p, 0.66, 0.76);
     glows.forEach((g) => {
       g.style.opacity = Math.max(0, ign * (1 - zoomK)).toFixed(3);
       g.classList.toggle("is-on", ign > 0.9 && zoomK < 1);
@@ -156,13 +156,12 @@
     // the ground around the photo lights up with it (no dark band on tall screens)
     const lit = SS.clamp(sweep * 1.15);
     stage.style.backgroundColor = `rgb(${Math.round(26 * lit)}, ${Math.round(23 * lit)}, ${Math.round(20 * lit)})`;
-    ambient.style.opacity = (lit * (1 - R(p, 0.66, 0.8))).toFixed(3);
 
     // 3 · callouts
     let active = -1;
     callouts.forEach((c, i) => {
-      const k = SS.easeOut(R(p, 0.42 + i * 0.045, 0.47 + i * 0.045));
-      const o = R(p, 0.63, 0.67);
+      const k = SS.easeOut(R(p, 0.46 + i * 0.035, 0.51 + i * 0.035));
+      const o = R(p, 0.64, 0.68);
       const v = k * (1 - o);
       c.style.opacity = v.toFixed(3);
       const label = c.firstElementChild.nextElementSibling;
@@ -176,11 +175,12 @@
     });
 
     // 4 · dive into the wheel — sized in layout pixels (keeps the photo & vector sharp)
-    const z = SS.easeInOut(R(p, 0.64, 0.93));
+    const z = SS.easeInOut(R(p, 0.66, 0.93));
     const sMax = phone ? 3.4 : 3.8;
     const s = Math.pow(sMax, z);
     const W = fw * s, H = fh * s;
-    const baseX = fx + WHEEL[0] * fw, baseY = fy + WHEEL[1] * fh;
+    const panX = SS.lerp(panFrom, panTo, SS.easeInOut(R(p, 0.3, 0.64)));
+    const baseX = panX + WHEEL[0] * fw, baseY = fy + WHEEL[1] * fh;
     const cx = SS.lerp(baseX, vw / 2, z), cy = SS.lerp(baseY, vh * 0.46, z);
     const x = cx - WHEEL[0] * W, y = cy - WHEEL[1] * H;
     frame.style.width = W.toFixed(1) + "px";
@@ -209,7 +209,7 @@
     veil.style.opacity = R(p, 0.93, 1).toFixed(3);
 
     // index
-    const phase = p < 0.42 ? 0 : p < 0.66 ? 1 : 2;
+    const phase = p < 0.46 ? 0 : p < 0.66 ? 1 : 2;
     idx.forEach((li, i) => li.classList.toggle("is-on", i === phase));
   }
 
