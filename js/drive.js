@@ -102,15 +102,18 @@
 
   // keep every callout label fully on screen, whatever the aspect ratio
   const nudge = () => {
+    const st = stage.getBoundingClientRect(); // measure against the stage, not the viewport (it may be off-screen)
     callouts.forEach((c) => {
       const label = c.querySelector("div");
       label.style.translate = "0 0";
-      const r = label.getBoundingClientRect();
-      if (!r.width) return;
+      const b = label.getBoundingClientRect();
+      if (!b.width) return;
+      const r = { left: b.left - st.left, right: b.right - st.left, top: b.top - st.top, bottom: b.bottom - st.top };
       let dx = 0, dy = 0;
       if (r.left < 16) dx = 16 - r.left;
       if (r.right > vw - 16) dx = vw - 16 - r.right;
       if (r.top < 76) dy = 76 - r.top;
+      if (r.bottom + dy > vh - 16) dy = vh - 16 - r.bottom;
       label.style.translate = `${dx.toFixed(0)}px ${dy.toFixed(0)}px`;
     });
     nudged = true;

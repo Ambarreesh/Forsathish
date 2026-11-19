@@ -305,37 +305,97 @@
     setTimeout(() => (copy.textContent = "Copy address"), 2000);
   });
 
-  /* ==================== proof photos: tap a drawing, see the real thing ==================== */
+  /* ==================== proof viewer: projects, internships, competitions, certificates ==================== */
   const dlg = $(".proof");
   if (dlg && dlg.showModal) {
     const img = $(".proof__img", dlg), cap = $(".proof__cap", dlg);
     const title = $(".proof__title", dlg), count = $(".proof__count", dlg);
     const prev = $(".proof__nav--prev", dlg), next = $(".proof__nav--next", dlg);
-    const stageEl = $(".proof__stage", dlg);
+    const stageEl = $(".proof__stage", dlg), thumbs = $(".proof__thumbs", dlg);
     const EASE_IN = "cubic-bezier(0.22, 1, 0.36, 1)", EASE_OUT = "cubic-bezier(0.33, 0, 0, 1)";
     let list = [], at = 0, origin = null;
 
     const inset = (r) => `inset(${Math.max(0, r.top)}px ${Math.max(0, innerWidth - r.right)}px ${Math.max(0, innerHeight - r.bottom)}px ${Math.max(0, r.left)}px)`;
+    const preload = (i) => { const it = list[(i + list.length) % list.length]; if (it) { const im = new Image(); im.decoding = "async"; im.src = it.src; } };
+    /* size every photo to the space it has: small screenshots scale up (to 2.5×) so they
+       fill the viewer on a desktop; large photos scale down. Zoom doubles the fitted size. */
+    const MAX_UP = 2.5, MAX_ZOOM = 3;
+    let zoomed = false;
+    const scales = () => {
+      const cs = getComputedStyle(stageEl);
+      const aw = stageEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const ah = stageEl.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const nw = img.naturalWidth || 1, nh = img.naturalHeight || 1;
+      const fitS = Math.max(0.05, Math.min(aw / nw, ah / nh, MAX_UP));
+      const zoomS = Math.min(Math.max(1, fitS * 2), Math.max(MAX_ZOOM, fitS));
+      return { fitS, zoomS, nw, nh };
+    };
+    const canZoom = () => { if (!img.naturalWidth) return false; const { fitS, zoomS } = scales(); return zoomS > fitS * 1.15; };
+    const fit = () => {
+      if (!img.naturalWidth) return;
+      const { fitS, zoomS, nw, nh } = scales();
+      const s = zoomed ? zoomS : fitS;
+      img.style.width = Math.round(nw * s) + "px";
+      img.style.height = Math.round(nh * s) + "px";
+    };
+    const setZoom = (on) => {
+      zoomed = on;
+      stageEl.classList.toggle("is-zoomed", on);
+      img.title = on ? "Click to fit" : canZoom() ? "Click to zoom" : "";
+      fit();
+      if (on) { stageEl.scrollTop = Math.max(0, (stageEl.scrollHeight - stageEl.clientHeight) / 2); stageEl.scrollLeft = Math.max(0, (stageEl.scrollWidth - stageEl.clientWidth) / 2); }
+    };
+    addEventListener("resize", () => { if (dlg.open) fit(); });
+
     const show = (i, dir = 0) => {
       at = (i + list.length) % list.length;
       const it = list[at];
+      setZoom(false);
+      img.classList.remove("is-zoomable");
+      img.style.width = img.style.height = "";
       img.src = it.src;
+      if (img.complete && img.naturalWidth) { fit(); img.classList.toggle("is-zoomable", canZoom()); }
       img.alt = it.cap || "";
       cap.textContent = it.cap || "";
-      count.textContent = `${at + 1} / ${list.length}`;
+      count.textContent = list.length > 1 ? `${at + 1} / ${list.length}` : "";
       prev.hidden = next.hidden = list.length < 2;
+      $$("button", thumbs).forEach((b, k) => { b.setAttribute("aria-selected", String(k === at)); b.tabIndex = k === at ? 0 : -1; });
+      const cur = thumbs.children[at];
+      // centre the active thumbnail by scrolling only the strip (scrollIntoView would also scroll the page)
+      if (cur) thumbs.scrollTo({ left: cur.offsetLeft - (thumbs.clientWidth - cur.offsetWidth) / 2, behavior: SS.reduced() ? "auto" : "smooth" });
       if (dir && !SS.reduced()) img.animate([{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: "none" }], { duration: 460, easing: EASE_IN });
+      preload(at + 1); preload(at - 1);
     };
-    const open = (fig) => {
-      try { list = JSON.parse(fig.dataset.proof); } catch { return; }
+    img.addEventListener("load", () => { fit(); img.classList.toggle("is-zoomable", canZoom()); img.title = canZoom() ? "Click to zoom" : ""; });
+    img.addEventListener("click", (e) => { e.stopPropagation(); if (stageEl.classList.contains("is-zoomed") || canZoom()) setZoom(!stageEl.classList.contains("is-zoomed")); });
+
+    const buildThumbs = () => {
+      thumbs.textContent = "";
+      thumbs.hidden = list.length < 2;
+      list.forEach((it, k) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-label", it.cap || `Photo ${k + 1}`);
+        const t = document.createElement("img");
+        t.src = it.src; t.alt = ""; t.loading = "lazy"; t.decoding = "async";
+        b.appendChild(t);
+        b.addEventListener("click", () => show(k, k > at ? 1 : -1));
+        thumbs.appendChild(b);
+      });
+    };
+
+    const open = (el) => {
+      try { list = JSON.parse(el.dataset.proof); } catch { return; }
       if (!list.length) return;
-      origin = fig;
-      title.textContent = fig.dataset.title || "Proof";
+      origin = el;
+      title.textContent = el.dataset.title || "Proof";
+      buildThumbs();
       show(0);
       dlg.showModal();
       if (SS.lenis) SS.lenis.stop();
-      // grow out of the drawing that was tapped, and shrink back into it on close
-      if (!SS.reduced()) dlg.animate([{ clipPath: inset(fig.getBoundingClientRect()), opacity: 0.5 }, { clipPath: "inset(0px 0px 0px 0px)", opacity: 1 }], { duration: 560, easing: EASE_IN });
+      // grow out of whatever was tapped, and shrink back into it on close (spatial consistency)
+      if (!SS.reduced()) dlg.animate([{ clipPath: inset(el.getBoundingClientRect()), opacity: 0.5 }, { clipPath: "inset(0px 0px 0px 0px)", opacity: 1 }], { duration: 560, easing: EASE_IN });
     };
     const close = () => {
       if (!dlg.open) return;
@@ -343,42 +403,59 @@
       const a = dlg.animate([{ clipPath: "inset(0px 0px 0px 0px)", opacity: 1 }, { clipPath: inset(origin.getBoundingClientRect()), opacity: 0.3 }], { duration: 380, easing: EASE_OUT });
       a.onfinish = () => dlg.close();
     };
-    dlg.addEventListener("close", () => { if (SS.lenis) SS.lenis.start(); if (origin) origin.focus({ preventScroll: true }); });
-    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+    dlg.addEventListener("close", () => { setZoom(false); if (SS.lenis) SS.lenis.start(); if (origin) origin.focus({ preventScroll: true }); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); if (stageEl.classList.contains("is-zoomed")) setZoom(false); else close(); });
     $(".proof__close", dlg).addEventListener("click", close);
     prev.addEventListener("click", () => show(at - 1, -1));
     next.addEventListener("click", () => show(at + 1, 1));
     dlg.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft" && list.length > 1) show(at - 1, -1);
-      if (e.key === "ArrowRight" && list.length > 1) show(at + 1, 1);
+      if (e.key === "ArrowLeft" && list.length > 1) { e.preventDefault(); show(at - 1, -1); }
+      if (e.key === "ArrowRight" && list.length > 1) { e.preventDefault(); show(at + 1, 1); }
     });
-    // swipe between photos; a plain tap on the dark area closes
+    // swipe between photos (not while zoomed — then a drag pans); a plain tap on the dark area closes
     let sx = null;
     stageEl.addEventListener("pointerdown", (e) => { sx = e.clientX; });
     stageEl.addEventListener("pointerup", (e) => {
       if (sx === null) return;
       const dx = e.clientX - sx; sx = null;
+      if (stageEl.classList.contains("is-zoomed")) return;
       if (Math.abs(dx) > 50 && list.length > 1) show(at + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
       else if (Math.abs(dx) < 6 && e.target === stageEl) close();
     });
 
-    $$(".proj__fig[data-proof]").forEach((fig) => {
+    // every element carrying data-proof becomes a trigger
+    $$("[data-proof]").forEach((el) => {
+      if (el.closest(".proof")) return;
       let n = 0;
-      try { n = JSON.parse(fig.dataset.proof).length; } catch {}
+      try { n = JSON.parse(el.dataset.proof).length; } catch {}
       if (!n) return;
-      fig.removeAttribute("aria-hidden");
-      const svg = $("svg", fig);
-      if (svg) svg.setAttribute("aria-hidden", "true");
-      fig.setAttribute("role", "button");
-      fig.setAttribute("tabindex", "0");
-      fig.setAttribute("aria-label", `View ${n} proof photo${n > 1 ? "s" : ""}: ${fig.dataset.title || "project"}`);
-      const badge = document.createElement("span");
-      badge.className = "proof-badge";
-      badge.setAttribute("aria-hidden", "true");
-      badge.textContent = `Proof photos · ${n}`;
-      fig.appendChild(badge);
-      fig.addEventListener("click", () => open(fig));
-      fig.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(fig); } });
+      const isFig = el.classList.contains("proj__fig");
+      const isBtn = el.tagName === "BUTTON";
+      if (!isBtn) {
+        el.removeAttribute("aria-hidden");
+        $$("svg", el).forEach((svg) => svg.setAttribute("aria-hidden", "true"));
+        el.setAttribute("role", "button");
+        el.setAttribute("tabindex", "0");
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(el); } });
+      }
+      const label = el.dataset.title || "details";
+      const what = isFig ? `proof photo${n > 1 ? "s" : ""}` : n > 1 ? "certificate and photos" : "certificate";
+      el.setAttribute("aria-label", `View ${what}: ${label}`);
+      if (isFig) {
+        const badge = document.createElement("span");
+        badge.className = "proof-badge";
+        badge.setAttribute("aria-hidden", "true");
+        badge.textContent = `Photos · ${n}`;
+        el.appendChild(badge);
+      } else if (!isBtn) {
+        el.classList.add("has-proof");
+        const tag = document.createElement("span");
+        tag.className = "proof-tag";
+        tag.setAttribute("aria-hidden", "true");
+        tag.textContent = n > 1 ? `View · ${n}` : "View";
+        el.appendChild(tag);
+      }
+      el.addEventListener("click", () => open(el));
     });
   }
 })();
