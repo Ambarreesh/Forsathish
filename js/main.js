@@ -35,8 +35,7 @@
     if (!desk) { word.style.setProperty("--name-size", size.toFixed(2) + "px"); nameBox.style.top = ""; return; }
     // sit the word between the intro block and the footer, clear of both
     const left = $(".hero__left");
-    const facts = $(".hero__facts");
-    const leftBottom = Math.max(left.offsetTop + left.offsetHeight, facts.offsetParent ? facts.offsetTop + facts.offsetHeight : 0);
+    const leftBottom = left.offsetTop + left.offsetHeight;
     size = Math.max(90, Math.min(size, (vh - 56 - 28 - (leftBottom + 20)) / 0.8));
     word.style.setProperty("--name-size", size.toFixed(2) + "px");
     const h = size * 0.8;
@@ -305,4 +304,81 @@
     catch { location.href = "mailto:" + copy.dataset.copy; }
     setTimeout(() => (copy.textContent = "Copy address"), 2000);
   });
+
+  /* ==================== proof photos: tap a drawing, see the real thing ==================== */
+  const dlg = $(".proof");
+  if (dlg && dlg.showModal) {
+    const img = $(".proof__img", dlg), cap = $(".proof__cap", dlg);
+    const title = $(".proof__title", dlg), count = $(".proof__count", dlg);
+    const prev = $(".proof__nav--prev", dlg), next = $(".proof__nav--next", dlg);
+    const stageEl = $(".proof__stage", dlg);
+    const EASE_IN = "cubic-bezier(0.22, 1, 0.36, 1)", EASE_OUT = "cubic-bezier(0.33, 0, 0, 1)";
+    let list = [], at = 0, origin = null;
+
+    const inset = (r) => `inset(${Math.max(0, r.top)}px ${Math.max(0, innerWidth - r.right)}px ${Math.max(0, innerHeight - r.bottom)}px ${Math.max(0, r.left)}px)`;
+    const show = (i, dir = 0) => {
+      at = (i + list.length) % list.length;
+      const it = list[at];
+      img.src = it.src;
+      img.alt = it.cap || "";
+      cap.textContent = it.cap || "";
+      count.textContent = `${at + 1} / ${list.length}`;
+      prev.hidden = next.hidden = list.length < 2;
+      if (dir && !SS.reduced()) img.animate([{ opacity: 0, transform: `translateX(${dir * 28}px)` }, { opacity: 1, transform: "none" }], { duration: 460, easing: EASE_IN });
+    };
+    const open = (fig) => {
+      try { list = JSON.parse(fig.dataset.proof); } catch { return; }
+      if (!list.length) return;
+      origin = fig;
+      title.textContent = fig.dataset.title || "Proof";
+      show(0);
+      dlg.showModal();
+      if (SS.lenis) SS.lenis.stop();
+      // grow out of the drawing that was tapped, and shrink back into it on close
+      if (!SS.reduced()) dlg.animate([{ clipPath: inset(fig.getBoundingClientRect()), opacity: 0.5 }, { clipPath: "inset(0px 0px 0px 0px)", opacity: 1 }], { duration: 560, easing: EASE_IN });
+    };
+    const close = () => {
+      if (!dlg.open) return;
+      if (SS.reduced() || !origin) { dlg.close(); return; }
+      const a = dlg.animate([{ clipPath: "inset(0px 0px 0px 0px)", opacity: 1 }, { clipPath: inset(origin.getBoundingClientRect()), opacity: 0.3 }], { duration: 380, easing: EASE_OUT });
+      a.onfinish = () => dlg.close();
+    };
+    dlg.addEventListener("close", () => { if (SS.lenis) SS.lenis.start(); if (origin) origin.focus({ preventScroll: true }); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+    $(".proof__close", dlg).addEventListener("click", close);
+    prev.addEventListener("click", () => show(at - 1, -1));
+    next.addEventListener("click", () => show(at + 1, 1));
+    dlg.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft" && list.length > 1) show(at - 1, -1);
+      if (e.key === "ArrowRight" && list.length > 1) show(at + 1, 1);
+    });
+    // swipe between photos; a plain tap on the dark area closes
+    let sx = null;
+    stageEl.addEventListener("pointerdown", (e) => { sx = e.clientX; });
+    stageEl.addEventListener("pointerup", (e) => {
+      if (sx === null) return;
+      const dx = e.clientX - sx; sx = null;
+      if (Math.abs(dx) > 50 && list.length > 1) show(at + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1);
+      else if (Math.abs(dx) < 6 && e.target === stageEl) close();
+    });
+
+    $$(".proj__fig[data-proof]").forEach((fig) => {
+      let n = 0;
+      try { n = JSON.parse(fig.dataset.proof).length; } catch {}
+      if (!n) return;
+      fig.removeAttribute("aria-hidden");
+      const svg = $("svg", fig);
+      if (svg) svg.setAttribute("aria-hidden", "true");
+      fig.setAttribute("role", "button");
+      fig.setAttribute("tabindex", "0");
+      fig.setAttribute("aria-label", `View ${n} proof photo${n > 1 ? "s" : ""}: ${fig.dataset.title || "project"}`);
+      const badge = document.createElement("span");
+      badge.className = "proof-badge";
+      badge.setAttribute("aria-hidden", "true");
+      badge.textContent = `Proof photos · ${n}`;
+      fig.appendChild(badge);
+      fig.addEventListener("click", () => open(fig));
+      fig.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(fig); } });
+    });
+  }
 })();

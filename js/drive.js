@@ -1,6 +1,6 @@
-/* The drive — a pinned, scroll-scrubbed studio sequence on the ultra-HD car.
-   1) studio lights sweep the car out of the dark, headlights ignite
-   2) HUD callouts tie each part of the car to real work
+/* The drive — a pinned, scroll-scrubbed sequence on Team Yaalee's SAE E-BAJA car (E12).
+   1) light sweeps the car out of the dark, the amber beacon starts to blink
+   2) callouts tie each part of the car to his roles on the team
    3) the camera dives into the front wheel and the photo becomes a blueprint */
 (() => {
   const SS = window.SS;
@@ -25,11 +25,7 @@
   const caption = $(".drive__caption");
   const idx = $$(".drive__index li");
 
-  // the photograph only needs the top tier once the camera starts diving in
-  car.src = "assets/car-3840.jpg";
-  car.removeAttribute("srcset");
-
-  /* ---------- blueprint detail, generated ---------- */
+  /* ---------- blueprint detail, generated: knobby off-road tyre, dish rim, drilled disc ---------- */
   const NS = "http://www.w3.org/2000/svg";
   const mk = (tag, attrs, parent) => {
     const el = document.createElementNS(NS, tag);
@@ -37,24 +33,23 @@
     parent.appendChild(el);
     return el;
   };
-  const holes = bp.querySelector(".bp-holes");
-  for (let ring = 0; ring < 2; ring++) {
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * Math.PI * 2 + ring * 0.17;
-      const r = 100 + ring * 9;
-      mk("circle", { class: "bp bp--3", cx: (Math.cos(a) * r).toFixed(2), cy: (Math.sin(a) * r).toFixed(2), r: 2.6, pathLength: 1 }, holes);
-    }
+  const tread = bp.querySelector(".bp-tread");
+  for (let i = 0; i < 28; i++) {
+    // alternating tread lugs between the tyre's outer and inner walls
+    const a = (i / 28) * Math.PI * 2;
+    const d = 0.07, r1 = 148, r2 = i % 2 ? 160 : 168;
+    const pt = (r, o) => `${(Math.cos(a + o) * r).toFixed(2)} ${(Math.sin(a + o) * r).toFixed(2)}`;
+    mk("path", { class: "bp bp--3", pathLength: 1, d: `M${pt(r1, -d)} L${pt(r2, -d)} L${pt(r2, d)} L${pt(r1, d)}` }, tread);
   }
-  const spokes = bp.querySelector(".bp-spokes");
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
-    const p = (r, d) => `${(Math.cos(a + d) * r).toFixed(2)} ${(Math.sin(a + d) * r).toFixed(2)}`;
-    mk("path", { class: "bp bp--2", pathLength: 1, d: `M${p(34, 0.12)} L${p(88, 0.06)} L${p(148, 0.2)} M${p(34, -0.12)} L${p(88, -0.06)} L${p(148, -0.2)} M${p(88, 0.06)} L${p(148, 0.05)} M${p(88, -0.06)} L${p(148, -0.05)}` }, spokes);
+  const holes = bp.querySelector(".bp-holes");
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    mk("circle", { class: "bp bp--3", cx: (Math.cos(a) * 79).toFixed(2), cy: (Math.sin(a) * 79).toFixed(2), r: 3, pathLength: 1 }, holes);
   }
   const studs = bp.querySelector(".bp-studs");
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 - Math.PI / 2 + Math.PI / 5;
-    mk("circle", { class: "stud", cx: (Math.cos(a) * 19).toFixed(2), cy: (Math.sin(a) * 19).toFixed(2), r: 4 }, studs);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    mk("circle", { class: "stud", cx: (Math.cos(a) * 21).toFixed(2), cy: (Math.sin(a) * 21).toFixed(2), r: 4.2 }, studs);
   }
   const bpLines = Array.from(bp.querySelectorAll(".bp"));
   bpLines.forEach((el, i) => { el.dataset.o = (i / bpLines.length) * 0.55; });
@@ -71,26 +66,35 @@
   caption.style.height = "92px";
 
   /* ---------- end veil (merges into the next section) ---------- */
+  // blurred copy of the photo fills any space the framed photo doesn't (ultrawide / tall screens)
+  const ambient = document.createElement("div");
+  ambient.className = "drive__ambient";
+  ambient.setAttribute("aria-hidden", "true");
+  stage.insertBefore(ambient, stage.firstChild);
+
   const veil = document.createElement("div");
   veil.style.cssText = "position:absolute;inset:0;background:var(--dark);opacity:0;pointer-events:none;z-index:2";
   stage.appendChild(veil);
 
   /* ---------- layout: frame the car to fit any screen shape ----------
-     In the photo the car spans ~60% of the width and ~50% of the height, centred
-     at (51.5%, 52%). Size the frame so the car fits the viewport with breathing
-     room, then centre the car. The frame edges are masked into the stage colour,
-     so the photo never needs to "cover". */
-  const AR = 16 / 9;
-  const WHEEL = [0.561, 0.606];
+     Measured on the 1280×960 photo: the car (beacon to tyres) spans x 23–71%,
+     y 23.5–78.5%, centred at (47%, 51%). Cover the screen when that still keeps
+     the whole car in view; otherwise shrink until the car fits (≤ 74% of the
+     height, ≤ 52% of the width on phones). Edges are masked into the stage. */
+  const AR = 4 / 3;
+  const CAR = { cx: 0.47, cy: 0.51, w: 0.48, h: 0.55 };
+  const WHEEL = [0.281, 0.693]; // front-left wheel centre
   let vw = 0, vh = 0, fw = 0, fh = 0, fx = 0, fy = 0, phone = false, nudged = false;
   const layout = () => {
     vw = innerWidth; vh = innerHeight;
     phone = vw < 760;
-    fw = Math.min(vw * (phone ? 1.6 : 1.42), vh * 2.45);
-    fw = Math.max(fw, Math.min(vw * 1.05, vh * AR * 1.4));
+    const cover = Math.max(vw, vh * AR);
+    const byHeight = (vh * 0.86) / CAR.h * AR;      // frame width at which the car is 86% of the height
+    const byWidth = (vw * (phone ? 0.92 : 0.86)) / CAR.w;
+    fw = Math.min(cover, byHeight, byWidth);
     fh = fw / AR;
-    fx = vw / 2 - fw * 0.515;
-    fy = vh * (phone ? 0.5 : 0.55) - fh * 0.52;
+    fx = vw / 2 - fw * CAR.cx;
+    fy = vh * (phone ? 0.46 : 0.54) - fh * CAR.cy;
     nudged = false;
   };
   layout();
@@ -136,20 +140,20 @@
     sub.style.opacity = (so * (1 - sOut)).toFixed(3);
     sub.style.transform = `translate3d(0, ${((1 - so) * 16 - sOut * 24).toFixed(1)}px, 0)`;
 
-    // 2 · studio sweep + headlights
+    // 2 · light sweep + the amber beacon on the roll hoop
     const sweep = SS.easeInOut(R(p, 0.12, 0.38));
     shade.style.backgroundPosition = `${((1 - sweep) * 100).toFixed(2)}% 0`;
     const ign = R(p, 0.3, 0.36);
-    const bump = Math.sin(Math.PI * R(p, 0.3, 0.42));
-    const zoomK = R(p, 0.66, 0.8);
-    glows.forEach((g, i) => {
-      const flick = ign > 0 && ign < 1 ? (Math.sin(ign * 40 + i) > 0 ? 1 : 0.35) : 1;
-      g.style.opacity = Math.max(0, (ign * flick * 0.85 + bump * 0.45) * (1 - zoomK)).toFixed(3);
+    const zoomK = R(p, 0.64, 0.74);
+    glows.forEach((g) => {
+      g.style.opacity = Math.max(0, ign * (1 - zoomK)).toFixed(3);
+      g.classList.toggle("is-on", ign > 0.9 && zoomK < 1);
     });
 
-    // the studio around the photo lights up with it (no black band on tall screens)
+    // the ground around the photo lights up with it (no dark band on tall screens)
     const lit = SS.clamp(sweep * 1.15);
-    stage.style.backgroundColor = `rgb(${Math.round(34 * lit)}, ${Math.round(27 * lit)}, ${Math.round(45 * lit)})`;
+    stage.style.backgroundColor = `rgb(${Math.round(26 * lit)}, ${Math.round(23 * lit)}, ${Math.round(20 * lit)})`;
+    ambient.style.opacity = (lit * (1 - R(p, 0.66, 0.8))).toFixed(3);
 
     // 3 · callouts
     let active = -1;
@@ -170,7 +174,7 @@
 
     // 4 · dive into the wheel — sized in layout pixels (keeps the photo & vector sharp)
     const z = SS.easeInOut(R(p, 0.64, 0.93));
-    const sMax = phone ? 4.2 : 5.6;
+    const sMax = phone ? 3.4 : 3.8;
     const s = Math.pow(sMax, z);
     const W = fw * s, H = fh * s;
     const baseX = fx + WHEEL[0] * fw, baseY = fy + WHEEL[1] * fh;
